@@ -31,8 +31,8 @@ class GameApiService {
                          window.location.hostname === '127.0.0.1';
 
     this.baseUrl = isDevelopment
-      ? 'http://localhost:5001/futfut-6a19f/us-central1/api'
-      : (import.meta.env.VITE_API_URL || 'https://us-central1-futfut-6a19f.cloudfunctions.net/api');
+      ? 'http://localhost:5001/futfut-6a19f/us-central1/api'  // Make sure this is 'api'
+      : 'https://us-central1-futfut-6a19f.cloudfunctions.net/api'; // Make sure this is 'api'
       
     console.log('🌐 API Base URL:', this.baseUrl);
     console.log('🔧 Development mode:', isDevelopment);
