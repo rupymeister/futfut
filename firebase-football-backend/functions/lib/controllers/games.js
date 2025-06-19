@@ -109,7 +109,7 @@ const createGame = async (req, res) => {
             return;
         }
         // Log successful validation
-        console.log(`✅ All ${questions.length} questions passed validation (minimum 10 answers each)`);
+        console.log(`✅ All ${questions.length} questions passed validation (minimum 3 answers each)`);
         // Create the game
         const result = await gameService.createGame({
             playerId,

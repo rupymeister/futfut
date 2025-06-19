@@ -404,13 +404,13 @@ export function Game({ players, onBackToMenu }: GameProps) {
       const uniqueFeatures = new Set(allFeatures);
       
       if (uniqueFeatures.size !== allFeatures.length) {
-        console.log(`Single Player Strategy ${strategyIndex + 1} has duplicate features, skipping...`);
+        // console.log(`Single Player Strategy ${strategyIndex + 1} has duplicate features, skipping...`);
         continue;
       }
       
       const validCells: GameCell[] = [];
       
-      console.log(`Trying single player fallback strategy ${strategyIndex + 1} with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers requirement...`);
+      // console.log(`Trying single player fallback strategy ${strategyIndex + 1} with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers requirement...`);
       
       for (let r = 0; r < rows.length; r++) {
         for (let c = 0; c < cols.length; c++) {
@@ -419,7 +419,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
           
           if ((rowHeader.type === "nationality" && colHeader.type === "nationality") || 
               (rowHeader.type === "role" && colHeader.type === "role")) {
-            console.log(`Skipping invalid ${rowHeader.type}-${colHeader.type} combination`);
+            // console.log(`Skipping invalid ${rowHeader.type}-${colHeader.type} combination`);
             continue;
           }
           
@@ -430,7 +430,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
             colHeader.type
           );
           
-          console.log(`Single Player Cell [${r},${c}] (${rowHeader.feature} × ${colHeader.feature}): ${players.length} players found`);
+          // console.log(`Single Player Cell [${r},${c}] (${rowHeader.feature} × ${colHeader.feature}): ${players.length} players found`);
           
           // Only add cells with at least 10 possible answers
           if (players.length >= MINIMUM_ANSWERS_PER_QUESTION) {
@@ -444,18 +444,18 @@ export function Game({ players, onBackToMenu }: GameProps) {
               players
             });
           } else {
-            console.log(`  ❌ Rejected: Only ${players.length} answers (need ${MINIMUM_ANSWERS_PER_QUESTION})`);
+            // console.log(`  ❌ Rejected: Only ${players.length} answers (need ${MINIMUM_ANSWERS_PER_QUESTION})`);
           }
         }
       }
       
       if (validCells.length >= 7) { // Still require at least 7 valid cells
-        console.log(`✅ Using single player fallback combination ${strategyIndex + 1} with ${validCells.length} cells (all ${MINIMUM_ANSWERS_PER_QUESTION}+ answers)`);
+        // console.log(`✅ Using single player fallback combination ${strategyIndex + 1} with ${validCells.length} cells (all ${MINIMUM_ANSWERS_PER_QUESTION}+ answers)`);
         return { cells: validCells, rowHeaders: rows, colHeaders: cols };
       }
     }
     
-    console.log(`❌ Even single player fallback combinations didn't produce enough cells with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers`);
+    // console.log(`❌ Even single player fallback combinations didn't produce enough cells with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers`);
     return {
       cells: [],
       rowHeaders: uniqueFeatureCombinations[0].rows,
@@ -479,7 +479,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
     const MINIMUM_ANSWERS_PER_QUESTION = 3; // Add this constant
     const maxAttempts = 100;
     
-    console.log(`Attempting to generate a complete ${GRID_SIZE}x${GRID_SIZE} single player grid with at least ${MINIMUM_ANSWERS_PER_QUESTION} answers per question...`);
+    // console.log(`Attempting to generate a complete ${GRID_SIZE}x${GRID_SIZE} single player grid with at least ${MINIMUM_ANSWERS_PER_QUESTION} answers per question...`);
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const grid = generateValidCellsGrid();
@@ -495,15 +495,15 @@ export function Game({ players, onBackToMenu }: GameProps) {
         bestGrid = grid;
         bestCellCount = grid.cells.length;
         
-        console.log(`Single Player Attempt ${attempt + 1}: Found grid with ${bestCellCount}/${expectedCellCount} valid cells (all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers)`);
+        // console.log(`Single Player Attempt ${attempt + 1}: Found grid with ${bestCellCount}/${expectedCellCount} valid cells (all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers)`);
         
         // Log answer counts for verification
         grid.cells.forEach((cell, index) => {
-          console.log(`  Single Player Cell ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} answers`);
+          // console.log(`  Single Player Cell ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} answers`);
         });
         
         if (bestCellCount === expectedCellCount) {
-          console.log(`✅ Complete single player grid found with all questions having ${MINIMUM_ANSWERS_PER_QUESTION}+ answers on attempt ${attempt + 1}!`);
+          // console.log(`✅ Complete single player grid found with all questions having ${MINIMUM_ANSWERS_PER_QUESTION}+ answers on attempt ${attempt + 1}!`);
           break;
         }
       } else if (grid.cells.length > 0) {
@@ -513,20 +513,20 @@ export function Game({ players, onBackToMenu }: GameProps) {
         );
         
         if (insufficientCells.length > 0) {
-          console.log(`Single Player Attempt ${attempt + 1}: Rejected grid - ${insufficientCells.length} cells have insufficient answers:`);
+          // console.log(`Single Player Attempt ${attempt + 1}: Rejected grid - ${insufficientCells.length} cells have insufficient answers:`);
           insufficientCells.forEach(cell => {
-            console.log(`  ${cell.rowFeature} × ${cell.colFeature}: only ${cell.players.length} answers (need ${MINIMUM_ANSWERS_PER_QUESTION})`);
+            // console.log(`  ${cell.rowFeature} × ${cell.colFeature}: only ${cell.players.length} answers (need ${MINIMUM_ANSWERS_PER_QUESTION})`);
           });
         }
       }
       
       if (attempt % 20 === 19) {
-        console.log(`Single Player Progress: ${attempt + 1}/${maxAttempts} attempts completed. Best valid grid: ${bestCellCount}/${expectedCellCount} cells`);
+        // console.log(`Single Player Progress: ${attempt + 1}/${maxAttempts} attempts completed. Best valid grid: ${bestCellCount}/${expectedCellCount} cells`);
       }
     }
     
     if (bestCellCount < expectedCellCount) {
-      console.log(`⚠️ Could not generate complete single player grid with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers per question (best: ${bestCellCount}/${expectedCellCount}). Trying fallback strategies...`);
+      // console.log(`⚠️ Could not generate complete single player grid with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers per question (best: ${bestCellCount}/${expectedCellCount}). Trying fallback strategies...`);
       
       const fallbackGrid = generateFallbackGrid();
       
@@ -536,7 +536,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
       );
       
       if (validFallbackCells.length > bestCellCount) {
-        console.log(`📋 Using single player fallback grid with ${validFallbackCells.length} valid cells (${MINIMUM_ANSWERS_PER_QUESTION}+ answers each)`);
+        // console.log(`📋 Using single player fallback grid with ${validFallbackCells.length} valid cells (${MINIMUM_ANSWERS_PER_QUESTION}+ answers each)`);
         return {
           ...fallbackGrid,
           cells: validFallbackCells // Only return cells with enough answers
@@ -571,7 +571,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
     
     // Check if we have enough valid cells
     if (cells.length < expectedCellCount) {
-      console.log(`❌ Incomplete single player grid generated (${cells.length}/${expectedCellCount} cells). Restarting...`);
+      // console.log(`❌ Incomplete single player grid generated (${cells.length}/${expectedCellCount} cells). Restarting...`);
       setTimeout(() => {
         initializeGame();
       }, 100);
@@ -581,9 +581,9 @@ export function Game({ players, onBackToMenu }: GameProps) {
     // Double-check that all cells have at least 10 answers
     const insufficientCells = cells.filter(cell => cell.players.length < MINIMUM_ANSWERS_PER_QUESTION);
     if (insufficientCells.length > 0) {
-      console.log(`❌ Single player grid has ${insufficientCells.length} cells with insufficient answers. Restarting...`);
+      // console.log(`❌ Single player grid has ${insufficientCells.length} cells with insufficient answers. Restarting...`);
       insufficientCells.forEach(cell => {
-        console.log(`  ${cell.rowFeature} × ${cell.colFeature}: ${cell.players.length} answers`);
+        // console.log(`  ${cell.rowFeature} × ${cell.colFeature}: ${cell.players.length} answers`);
       });
       setTimeout(() => {
         initializeGame();
@@ -591,11 +591,11 @@ export function Game({ players, onBackToMenu }: GameProps) {
       return;
     }
     
-    console.log(`✅ Complete single player grid generated with ${cells.length} cells, all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers.`);
+    // console.log(`✅ Complete single player grid generated with ${cells.length} cells, all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers.`);
     
     // Log answer counts for verification
     cells.forEach((cell, index) => {
-      console.log(`Single Player Question ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} possible answers`);
+      // console.log(`Single Player Question ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} possible answers`);
     });
     
     // Prepare questions for the backend
@@ -614,7 +614,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
 
     try {
       // Validate questions with backend before creating game
-      console.log('🔍 Validating single player questions with backend...');
+      // console.log('🔍 Validating single player questions with backend...');
       const validation = await gameApi.validateQuestions(questions);
       
       if (!validation.isValid) {
@@ -625,7 +625,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
         return;
       }
       
-      console.log('✅ Single player backend validation passed:', validation.summary);
+      // console.log('✅ Single player backend validation passed:', validation.summary);
 
       // Create single player game in backend
       const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
@@ -641,14 +641,14 @@ export function Game({ players, onBackToMenu }: GameProps) {
       setCurrentGameId(gameData.game.id);
       setGameQuestions(gameData.questions);
       
-      console.log('🎮 Single player game created with ID:', gameData.game.id);
-      console.log('📊 Single player game validation summary:', gameData.validation || 'No validation data');
+      // console.log('🎮 Single player game created with ID:', gameData.game.id);
+      // console.log('📊 Single player game validation summary:', gameData.validation || 'No validation data');
     } catch (error) {
       console.error('❌ Failed to create single player game in backend:', error);
       
       // If backend validation fails, regenerate the game
       if (error instanceof Error && error.message.includes('validation')) {
-        console.log('🔄 Regenerating single player game due to validation failure...');
+        // console.log('🔄 Regenerating single player game due to validation failure...');
         setTimeout(() => {
           initializeGame();
         }, 100);
@@ -700,10 +700,10 @@ export function Game({ players, onBackToMenu }: GameProps) {
 
   // Console'a doğru cevapları yazdır
   const logCorrectAnswers = (cells: GameCell[]) => {
-    console.log("=== Single Player Game - Doğru Cevaplar ===");
+    // console.log("=== Single Player Game - Doğru Cevaplar ===");
     for (const cell of cells) {
-      console.log(`Hücre [${cell.row}][${cell.col}] (${cell.rowFeatureType}: ${cell.rowFeature} - ${cell.colFeatureType}: ${cell.colFeature}):`);
-      console.log(cell.players.map(p => p.name));
+      // console.log(`Hücre [${cell.row}][${cell.col}] (${cell.rowFeatureType}: ${cell.rowFeature} - ${cell.colFeatureType}: ${cell.colFeature}):`);
+      // console.log(cell.players.map(p => p.name));
     }
   };
 
@@ -823,7 +823,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
     
     if (correct) {
       if (matchedPlayer) {
-        console.log(`Correct guess: "${guess}" matched "${matchedPlayer.name}"`);
+        // console.log(`Correct guess: "${guess}" matched "${matchedPlayer.name}"`);
       }
       
       const newAnsweredCells = [...answeredCells, { 
@@ -840,7 +840,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
         try {
           const playerId = localStorage.getItem('playerId');
           await gameApi.endGame(currentGameId, playerId || undefined); // Player wins by completing
-          console.log('🏁 Single player game completed and saved to backend');
+          // console.log('🏁 Single player game completed and saved to backend');
         } catch (error) {
           console.error('Failed to end single player game:', error);
         }
