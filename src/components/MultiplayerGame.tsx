@@ -353,7 +353,7 @@ export function MultiplayerGame({ players, onBackToMenu }: MultiplayerGameProps)
     rowHeaders: {feature: string, type: FeatureCategory}[],
     colHeaders: {feature: string, type: FeatureCategory}[]
   } => {
-    const MINIMUM_ANSWERS_PER_QUESTION = 5;
+    const MINIMUM_ANSWERS_PER_QUESTION = 3; // Minimum answers required per question
     
     const uniqueFeatureCombinations = [
       {
@@ -477,7 +477,7 @@ export function MultiplayerGame({ players, onBackToMenu }: MultiplayerGameProps)
     let bestCellCount = 0;
     const GRID_SIZE = 3;
     const expectedCellCount = GRID_SIZE * GRID_SIZE;
-    const MINIMUM_ANSWERS_PER_QUESTION = 5; // Add this constant
+    const MINIMUM_ANSWERS_PER_QUESTION = 3; // Add this constant
     const maxAttempts = 100;
     
     // console.log(`Attempting to generate a complete ${GRID_SIZE}x${GRID_SIZE} multiplayer grid with at least ${MINIMUM_ANSWERS_PER_QUESTION} answers per question...`);
@@ -568,7 +568,7 @@ export function MultiplayerGame({ players, onBackToMenu }: MultiplayerGameProps)
     
     const GRID_SIZE = 3;
     const expectedCellCount = GRID_SIZE * GRID_SIZE;
-    const MINIMUM_ANSWERS_PER_QUESTION = 5;
+    const MINIMUM_ANSWERS_PER_QUESTION = 3;
     
     // Check if we have enough valid cells
     if (cells.length < expectedCellCount) {
@@ -977,12 +977,7 @@ export function MultiplayerGame({ players, onBackToMenu }: MultiplayerGameProps)
           <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
             🎲 Multiplayer Oyunu Oluşturuluyor...
           </div>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            Her sorunun en az 10 farklı cevabı olacak şekilde grid oluşturuluyor
-          </div>
-          <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-            Deneme: {generationAttempts}
-          </div>
+          
         </div>
       )}
 
