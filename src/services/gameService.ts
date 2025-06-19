@@ -54,56 +54,6 @@ class GameApiService {
     }
   }
 
-  async createGame(
-    playerId: string, 
-    sessionId: string, 
-    gameMode: 'single' | 'multiplayer',
-    questions: GameQuestion[],
-    player2Id?: string
-  ) {
-    try {
-      console.log('📡 Creating game with data:', {
-        playerId,
-        sessionId,
-        gameMode,
-        questionsCount: questions.length,
-        player2Id
-      });
-
-      const response = await fetch(`${this.baseUrl}/games`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          playerId,
-          sessionId,
-          gameMode,
-          player2Id,
-          questions
-        })
-      });
-
-      const responseText = await response.text();
-      console.log('📡 Raw response:', responseText);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}, response: ${responseText}`);
-      }
-
-      const result = JSON.parse(responseText);
-      if (result.success) {
-        console.log(`✅ ${gameMode} game created successfully:`, result.data.game.id);
-        return result.data;
-      } else {
-        throw new Error(result.error || 'Failed to create game');
-      }
-    } catch (error) {
-      console.error('❌ Error creating game:', error);
-      throw error;
-    }
-  }
 
   async submitAnswer(gameId: string, answer: GameAnswer) {
     try {
@@ -182,6 +132,116 @@ class GameApiService {
       }
     } catch (error) {
       console.error('Error ending game:', error);
+      throw error;
+    }
+  }
+
+   // Method to validate questions before creating game
+  async validateQuestions(questions: GameQuestion[]): Promise<{
+    isValid: boolean;
+    summary: any;
+    details: any[];
+    message: string;
+  }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/games/validate`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ questions })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Validation failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return {
+        isValid: result.summary.canCreateGame,
+        summary: result.summary,
+        details: result.details,
+        message: result.message
+      };
+    } catch (error) {
+      console.error('❌ Error validating questions:', error);
+      throw error;
+    }
+  }
+
+  async createGame(
+    playerId: string, 
+    sessionId: string, 
+    gameMode: 'single' | 'multiplayer',
+    questions: GameQuestion[],
+    player2Id?: string
+  ) {
+    try {
+      // Validate questions first
+      console.log('🔍 Validating questions before game creation...');
+      const validation = await this.validateQuestions(questions);
+      
+      if (!validation.isValid) {
+        const errorMessage = `Cannot create game: ${validation.message}\n\n` +
+          `Issues found:\n${validation.details
+            .filter(q => !q.meetsMinimum)
+            .map(q => `• Question ${q.questionNumber}: ${q.issues.join(', ')}`)
+            .join('\n')}`;
+        
+        throw new Error(errorMessage);
+      }
+
+      console.log('✅ Question validation passed');
+      console.log('📡 Creating game with validated questions...');
+
+      const response = await fetch(`${this.baseUrl}/games`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          playerId,
+          sessionId,
+          gameMode,
+          player2Id,
+          questions
+        })
+      });
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+            
+            if (errorData.details && errorData.details.validationErrors) {
+              errorMessage += '\n\nValidation Issues:\n' + 
+                errorData.details.validationErrors.join('\n');
+            }
+          }
+        } catch (parseError) {
+          errorMessage += `, response: ${responseText}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const result = JSON.parse(responseText);
+      if (result.success) {
+        console.log(`✅ ${gameMode} game created successfully:`, result.data.game.id);
+        console.log(`📊 Validation summary:`, result.validation);
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to create game');
+      }
+    } catch (error) {
+      console.error('❌ Error creating game:', error);
       throw error;
     }
   }

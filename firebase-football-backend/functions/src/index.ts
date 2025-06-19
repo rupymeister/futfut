@@ -34,7 +34,18 @@ export const db = admin.firestore();
 const app = express();
 
 // Enable CORS for all routes
-app.use(cors({ origin: true }));
+// Find the CORS configuration and update it
+app.use(cors({ 
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173', // Vite dev
+    'http://localhost:4173', // Vite preview
+    'https://futfut.vercel.app', // Your main Vercel domain
+    /https:\/\/futfut.*\.vercel\.app$/, // All Vercel preview deployments
+    /\.vercel\.app$/ // Allow all vercel subdomains
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Error handling middleware
@@ -127,11 +138,77 @@ app.get('/', (req: Request, res: Response) => {
 
 // Game routes
 app.post('/games', gameController.createGame);
+
 app.get('/games/:id', gameController.getGame);
 app.put('/games/:id', gameController.updateGame);
 app.delete('/games/:id', gameController.deleteGame);
 app.post('/games/:gameId/answers', gameController.submitAnswer);
 app.post('/games/:gameId/end', gameController.endGame);
+
+// Debug endpoint to validate questions without creating a game
+app.post('/games/validate', (req: Request, res: Response): void => {
+  try {
+    const { questions } = req.body;
+    
+    if (!Array.isArray(questions)) {
+      res.status(400).json({
+        success: false,
+        error: 'Questions must be an array'
+      });
+      return;
+    }
+
+    const MINIMUM_ANSWERS_REQUIRED = 10;
+    const results = questions.map((question, index) => {
+      const answerCount = question.correctAnswers?.length || 0;
+      const validAnswers = question.correctAnswers?.filter((answer: string) => 
+        answer && answer.trim().length > 0
+      ) || [];
+      const uniqueAnswers = new Set(validAnswers.map((answer: string) => answer.toLowerCase().trim()));
+
+      return {
+        questionNumber: question.questionNumber || index + 1,
+        rowFeature: question.rowFeature,
+        colFeature: question.colFeature,
+        totalAnswers: answerCount,
+        validAnswers: validAnswers.length,
+        uniqueAnswers: uniqueAnswers.size,
+        meetsMinimum: uniqueAnswers.size >= MINIMUM_ANSWERS_REQUIRED,
+        issues: [
+          ...(answerCount < MINIMUM_ANSWERS_REQUIRED ? [`Only ${answerCount} answers (need ${MINIMUM_ANSWERS_REQUIRED})`] : []),
+          ...(validAnswers.length !== answerCount ? [`${answerCount - validAnswers.length} empty answers`] : []),
+          ...(uniqueAnswers.size !== validAnswers.length ? [`${validAnswers.length - uniqueAnswers.size} duplicate answers`] : [])
+        ]
+      };
+    });
+
+    const validQuestions = results.filter(r => r.meetsMinimum);
+    const invalidQuestions = results.filter(r => !r.meetsMinimum);
+
+    res.json({
+      success: true,
+      summary: {
+        totalQuestions: questions.length,
+        validQuestions: validQuestions.length,
+        invalidQuestions: invalidQuestions.length,
+        canCreateGame: invalidQuestions.length === 0,
+        minimumRequired: MINIMUM_ANSWERS_REQUIRED
+      },
+      details: results,
+      message: invalidQuestions.length === 0 
+        ? 'All questions meet the minimum answer requirement'
+        : `${invalidQuestions.length} questions need more answers`
+    });
+
+  } catch (error) {
+    console.error('Error validating questions:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to validate questions',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
 
 // Analytics routes
 app.post('/analytics/track', analyticsController.trackEvent);
