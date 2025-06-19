@@ -38,7 +38,7 @@ const gameService = __importStar(require("../services/gameService"));
 // Validation function to ensure all questions have at least 10 possible answers
 const validateMinimumAnswers = (questions) => {
     const errors = [];
-    const MINIMUM_ANSWERS_REQUIRED = 10;
+    const MINIMUM_ANSWERS_REQUIRED = 3;
     questions.forEach((question) => {
         var _a, _b;
         const answerCount = ((_a = question.correctAnswers) === null || _a === void 0 ? void 0 : _a.length) || 0;
@@ -82,7 +82,7 @@ const createGame = async (req, res) => {
             });
             return;
         }
-        // Validate that all questions have at least 10 possible answers
+        // Validate that all questions have at least 3 possible answers
         const validation = validateMinimumAnswers(questions);
         if (!validation.isValid) {
             console.warn('Game creation rejected due to insufficient answers:', validation.errors);
@@ -90,8 +90,8 @@ const createGame = async (req, res) => {
                 success: false,
                 error: 'Cannot create game: Some questions do not have enough possible answers',
                 details: {
-                    requirement: 'Each question must have at least 10 different possible correct answers',
-                    minimumRequired: 10,
+                    requirement: 'Each question must have at least 3 different possible correct answers',
+                    minimumRequired: 3,
                     validationErrors: validation.errors,
                     totalQuestions: questions.length,
                     failedQuestions: validation.errors.length
@@ -125,7 +125,7 @@ const createGame = async (req, res) => {
             message: `${gameMode} game created successfully with ${questions.length} validated questions`,
             validation: {
                 passed: true,
-                minimumAnswersRequired: 10,
+                minimumAnswersRequired: 3,
                 questionsValidated: questions.length
             }
         });

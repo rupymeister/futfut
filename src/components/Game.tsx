@@ -43,6 +43,11 @@ export function Game({ players, onBackToMenu }: GameProps) {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [gameQuestions, setGameQuestions] = useState<(GameQuestion & { id: string })[]>([]);
   
+  // Game generation state
+  const [isGeneratingGame, setIsGeneratingGame] = useState(false);
+  const [generationAttempts, setGenerationAttempts] = useState(0);
+  const [gameGenerationError, setGameGenerationError] = useState<string | null>(null);
+  
   // Track if the game has been initialized to prevent refreshing on re-renders
   const gameInitialized = useRef(false);
 
@@ -347,6 +352,8 @@ export function Game({ players, onBackToMenu }: GameProps) {
     rowHeaders: {feature: string, type: FeatureCategory}[],
     colHeaders: {feature: string, type: FeatureCategory}[]
   } => {
+    const MINIMUM_ANSWERS_PER_QUESTION = 3;
+    
     const uniqueFeatureCombinations = [
       {
         rows: [
@@ -397,13 +404,13 @@ export function Game({ players, onBackToMenu }: GameProps) {
       const uniqueFeatures = new Set(allFeatures);
       
       if (uniqueFeatures.size !== allFeatures.length) {
-        console.log(`Strategy ${strategyIndex + 1} has duplicate features, skipping...`);
+        console.log(`Single Player Strategy ${strategyIndex + 1} has duplicate features, skipping...`);
         continue;
       }
       
       const validCells: GameCell[] = [];
       
-      console.log(`Trying fallback strategy ${strategyIndex + 1}...`);
+      console.log(`Trying single player fallback strategy ${strategyIndex + 1} with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers requirement...`);
       
       for (let r = 0; r < rows.length; r++) {
         for (let c = 0; c < cols.length; c++) {
@@ -423,9 +430,10 @@ export function Game({ players, onBackToMenu }: GameProps) {
             colHeader.type
           );
           
-          console.log(`Cell [${r},${c}] (${rowHeader.feature} × ${colHeader.feature}): ${players.length} players found`);
+          console.log(`Single Player Cell [${r},${c}] (${rowHeader.feature} × ${colHeader.feature}): ${players.length} players found`);
           
-          if (players.length > 0) {
+          // Only add cells with at least 10 possible answers
+          if (players.length >= MINIMUM_ANSWERS_PER_QUESTION) {
             validCells.push({
               row: r,
               col: c,
@@ -435,17 +443,19 @@ export function Game({ players, onBackToMenu }: GameProps) {
               colFeatureType: colHeader.type,
               players
             });
+          } else {
+            console.log(`  ❌ Rejected: Only ${players.length} answers (need ${MINIMUM_ANSWERS_PER_QUESTION})`);
           }
         }
       }
       
-      if (validCells.length >= 7) {
-        console.log(`✅ Using fallback combination ${strategyIndex + 1} with ${validCells.length} cells`);
+      if (validCells.length >= 7) { // Still require at least 7 valid cells
+        console.log(`✅ Using single player fallback combination ${strategyIndex + 1} with ${validCells.length} cells (all ${MINIMUM_ANSWERS_PER_QUESTION}+ answers)`);
         return { cells: validCells, rowHeaders: rows, colHeaders: cols };
       }
     }
     
-    console.log("❌ Even fallback combinations didn't produce a good grid");
+    console.log(`❌ Even single player fallback combinations didn't produce enough cells with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers`);
     return {
       cells: [],
       rowHeaders: uniqueFeatureCombinations[0].rows,
@@ -466,51 +476,100 @@ export function Game({ players, onBackToMenu }: GameProps) {
     let bestCellCount = 0;
     const GRID_SIZE = 3;
     const expectedCellCount = GRID_SIZE * GRID_SIZE;
+    const MINIMUM_ANSWERS_PER_QUESTION = 3; // Add this constant
     const maxAttempts = 100;
     
-    console.log(`Attempting to generate a complete ${GRID_SIZE}x${GRID_SIZE} single player grid...`);
+    console.log(`Attempting to generate a complete ${GRID_SIZE}x${GRID_SIZE} single player grid with at least ${MINIMUM_ANSWERS_PER_QUESTION} answers per question...`);
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const grid = generateValidCellsGrid();
       
-      if (grid.cells.length > bestCellCount) {
+      // Check if all cells have at least 10 possible answers
+      const validCellsWithEnoughAnswers = grid.cells.filter(cell => 
+        cell.players.length >= MINIMUM_ANSWERS_PER_QUESTION
+      );
+      
+      // Only consider this grid if ALL cells have enough answers
+      if (validCellsWithEnoughAnswers.length === grid.cells.length && 
+          grid.cells.length > bestCellCount) {
         bestGrid = grid;
         bestCellCount = grid.cells.length;
         
-        console.log(`Attempt ${attempt + 1}: Found grid with ${bestCellCount}/${expectedCellCount} valid cells`);
+        console.log(`Single Player Attempt ${attempt + 1}: Found grid with ${bestCellCount}/${expectedCellCount} valid cells (all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers)`);
+        
+        // Log answer counts for verification
+        grid.cells.forEach((cell, index) => {
+          console.log(`  Single Player Cell ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} answers`);
+        });
         
         if (bestCellCount === expectedCellCount) {
-          console.log(`✅ Complete single player grid found on attempt ${attempt + 1}!`);
+          console.log(`✅ Complete single player grid found with all questions having ${MINIMUM_ANSWERS_PER_QUESTION}+ answers on attempt ${attempt + 1}!`);
           break;
+        }
+      } else if (grid.cells.length > 0) {
+        // Log why this grid was rejected
+        const insufficientCells = grid.cells.filter(cell => 
+          cell.players.length < MINIMUM_ANSWERS_PER_QUESTION
+        );
+        
+        if (insufficientCells.length > 0) {
+          console.log(`Single Player Attempt ${attempt + 1}: Rejected grid - ${insufficientCells.length} cells have insufficient answers:`);
+          insufficientCells.forEach(cell => {
+            console.log(`  ${cell.rowFeature} × ${cell.colFeature}: only ${cell.players.length} answers (need ${MINIMUM_ANSWERS_PER_QUESTION})`);
+          });
         }
       }
       
       if (attempt % 20 === 19) {
-        console.log(`Progress: ${attempt + 1}/${maxAttempts} attempts completed. Best so far: ${bestCellCount}/${expectedCellCount} cells`);
+        console.log(`Single Player Progress: ${attempt + 1}/${maxAttempts} attempts completed. Best valid grid: ${bestCellCount}/${expectedCellCount} cells`);
       }
     }
     
     if (bestCellCount < expectedCellCount) {
-      console.log(`⚠️ Could not generate complete single player grid naturally (best: ${bestCellCount}/${expectedCellCount}). Trying fallback strategies...`);
+      console.log(`⚠️ Could not generate complete single player grid with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers per question (best: ${bestCellCount}/${expectedCellCount}). Trying fallback strategies...`);
       
       const fallbackGrid = generateFallbackGrid();
       
-      if (fallbackGrid.cells.length > bestCellCount) {
-        console.log(`📋 Using fallback single player grid with ${fallbackGrid.cells.length} cells`);
-        return fallbackGrid;
+      // Check fallback grid for minimum answers too
+      const validFallbackCells = fallbackGrid.cells.filter(cell => 
+        cell.players.length >= MINIMUM_ANSWERS_PER_QUESTION
+      );
+      
+      if (validFallbackCells.length > bestCellCount) {
+        console.log(`📋 Using single player fallback grid with ${validFallbackCells.length} valid cells (${MINIMUM_ANSWERS_PER_QUESTION}+ answers each)`);
+        return {
+          ...fallbackGrid,
+          cells: validFallbackCells // Only return cells with enough answers
+        };
       }
     }
     
     return bestGrid;
   };
 
-  // Update the initializeGame function with Firebase integration
+  // Update the initializeGame function with Firebase integration and validation
   const initializeGame = async () => {
+    const maxGenerationAttempts = 10;
+    
+    if (generationAttempts >= maxGenerationAttempts) {
+      setGameGenerationError(
+        'Tek oyuncu oyunu için yeterli oyuncu verisi bulunamadı. Her soru için en az 3 farklı cevap gerekli. ' +
+        'Lütfen oyuncu veritabanını genişletin veya daha az kısıtlayıcı kriterler kullanın.'
+      );
+      setIsGeneratingGame(false);
+      return;
+    }
+
+    setIsGeneratingGame(true);
+    setGenerationAttempts(prev => prev + 1);
+    
     const { cells, rowHeaders, colHeaders } = generateValidGrid();
     
     const GRID_SIZE = 3;
     const expectedCellCount = GRID_SIZE * GRID_SIZE;
+    const MINIMUM_ANSWERS_PER_QUESTION = 3;
     
+    // Check if we have enough valid cells
     if (cells.length < expectedCellCount) {
       console.log(`❌ Incomplete single player grid generated (${cells.length}/${expectedCellCount} cells). Restarting...`);
       setTimeout(() => {
@@ -519,7 +578,25 @@ export function Game({ players, onBackToMenu }: GameProps) {
       return;
     }
     
-    console.log(`✅ Complete single player grid generated with ${cells.length} cells.`);
+    // Double-check that all cells have at least 10 answers
+    const insufficientCells = cells.filter(cell => cell.players.length < MINIMUM_ANSWERS_PER_QUESTION);
+    if (insufficientCells.length > 0) {
+      console.log(`❌ Single player grid has ${insufficientCells.length} cells with insufficient answers. Restarting...`);
+      insufficientCells.forEach(cell => {
+        console.log(`  ${cell.rowFeature} × ${cell.colFeature}: ${cell.players.length} answers`);
+      });
+      setTimeout(() => {
+        initializeGame();
+      }, 100);
+      return;
+    }
+    
+    console.log(`✅ Complete single player grid generated with ${cells.length} cells, all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers.`);
+    
+    // Log answer counts for verification
+    cells.forEach((cell, index) => {
+      console.log(`Single Player Question ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} possible answers`);
+    });
     
     // Prepare questions for the backend
     const questions: GameQuestion[] = cells.map((cell, index) => ({
@@ -536,6 +613,20 @@ export function Game({ players, onBackToMenu }: GameProps) {
     }));
 
     try {
+      // Validate questions with backend before creating game
+      console.log('🔍 Validating single player questions with backend...');
+      const validation = await gameApi.validateQuestions(questions);
+      
+      if (!validation.isValid) {
+        console.warn('❌ Single player backend validation failed. Regenerating game...', validation);
+        setTimeout(() => {
+          initializeGame();
+        }, 100);
+        return;
+      }
+      
+      console.log('✅ Single player backend validation passed:', validation.summary);
+
       // Create single player game in backend
       const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
       const sessionId = `single_${playerId}_${Date.now()}`;
@@ -551,9 +642,24 @@ export function Game({ players, onBackToMenu }: GameProps) {
       setGameQuestions(gameData.questions);
       
       console.log('🎮 Single player game created with ID:', gameData.game.id);
+      console.log('📊 Single player game validation summary:', gameData.validation || 'No validation data');
     } catch (error) {
-      console.error('Failed to create single player game in backend:', error);
+      console.error('❌ Failed to create single player game in backend:', error);
+      
+      // If backend validation fails, regenerate the game
+      if (error instanceof Error && error.message.includes('validation')) {
+        console.log('🔄 Regenerating single player game due to validation failure...');
+        setTimeout(() => {
+          initializeGame();
+        }, 100);
+        return;
+      }
     }
+
+    // If successful, clear loading state
+    setIsGeneratingGame(false);
+    setGenerationAttempts(0);
+    setGameGenerationError(null);
     
     setValidCells(cells);
     setHeaderRows(rowHeaders);
@@ -775,6 +881,8 @@ export function Game({ players, onBackToMenu }: GameProps) {
     setAnsweredCells([]);
     setSelectedCell(null);
     setGuessResult(null);
+    setGameGenerationError(null); // Reset error state
+    setGenerationAttempts(0); // Reset attempts
     gameInitialized.current = false;
     
     // Initialize new game
@@ -808,7 +916,8 @@ export function Game({ players, onBackToMenu }: GameProps) {
         alignItems: 'center', 
         marginBottom: '20px',
         width: '100%',
-        maxWidth: '800px'
+        maxWidth: '800px',
+        minHeight: '60px'
       }}>
         <h1 style={{ margin: 0, fontSize: '2rem' }}>Futbolcu Tahmin Oyunu</h1>
         <button 
@@ -835,61 +944,119 @@ export function Game({ players, onBackToMenu }: GameProps) {
           marginBottom: '10px',
           fontFamily: 'monospace'
         }}>
-          Game ID: {currentGameId}
+          Single Player Game ID: {currentGameId}
+        </div>
+      )}
+
+      {/* Loading State */}
+      {isGeneratingGame && (
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
+            🎲 Oyun Oluşturuluyor...
+          </div>
+
+        </div>
+      )}
+
+      {/* Error Display */}
+      {gameGenerationError && (
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#ffebee',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          border: '1px solid #f44336'
+        }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#d32f2f', marginBottom: '10px' }}>
+            ❌ Oyun Oluşturulamadı
+          </div>
+          <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+            {gameGenerationError}
+          </div>
+          <button
+            onClick={() => {
+              setGameGenerationError(null);
+              setGenerationAttempts(0);
+              initializeGame();
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#f44336',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Tekrar Dene
+          </button>
         </div>
       )}
 
       {/* Score Display */}
-      <div style={{ 
-        marginBottom: '10px', 
-        fontSize: '14px', 
-        color: '#666',
-        display: 'flex',
-        gap: '20px'
-      }}>
-        <span>Doğru: {answeredCells.length}</span>
-        <span>Kalan: {validCells.length - answeredCells.length}</span>
-        <span>Toplam: {validCells.length}</span>
-      </div>
+      {!isGeneratingGame && !gameGenerationError && (
+        <div style={{ 
+          marginBottom: '10px', 
+          fontSize: '14px', 
+          color: '#666',
+          display: 'flex',
+          gap: '20px',
+          minHeight: '20px'
+        }}>
+          <span>Doğru: {answeredCells.length}</span>
+          <span>Kalan: {validCells.length - answeredCells.length}</span>
+          <span>Toplam: {validCells.length}</span>
+        </div>
+      )}
 
       {/* New Game Button */}
       <button 
         onClick={newGame} 
+        disabled={isGeneratingGame}
         style={{
           padding: '8px 16px',
-          backgroundColor: '#4caf50',
+          backgroundColor: isGeneratingGame ? '#bdc3c7' : '#4caf50',
           color: 'white',
           border: 'none',
           borderRadius: '4px',
           marginBottom: '20px',
-          cursor: 'pointer',
-          fontSize: '14px'
+          cursor: isGeneratingGame ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          minWidth: '150px'
         }}
       >
-        Yeni Oyun Başlat
+        {isGeneratingGame ? 'Oluşturuluyor...' : 'Yeni Oyun Başlat'}
       </button>
 
       {/* Grid Container */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: '100%',
-        marginBottom: '30px'
-      }}>
-        <PlayerGrid
-          rowHeaders={headerRows}
-          colHeaders={headerCols}
-          onCellClick={onCellClick}
-          selectedCell={selectedCell || undefined}
-          activeCells={validCells.map(c => [c.row, c.col])}
-          answeredCells={answeredCells}
-          getFeatureTypeName={getFeatureTypeName}
-        />
-      </div>
+      {!isGeneratingGame && !gameGenerationError && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '100%',
+          marginBottom: '30px'
+        }}>
+          <PlayerGrid
+            rowHeaders={headerRows}
+            colHeaders={headerCols}
+            onCellClick={onCellClick}
+            selectedCell={selectedCell || undefined}
+            activeCells={validCells.map(c => [c.row, c.col])}
+            answeredCells={answeredCells}
+            getFeatureTypeName={getFeatureTypeName}
+          />
+        </div>
+      )}
 
       {/* Player Guess Modal */}
-      {selectedCell !== null && (
+      {selectedCell !== null && !isGeneratingGame && !gameGenerationError && (
         <PlayerGuess
           playersAtCell={getPlayersAtCell(selectedCell[0], selectedCell[1])}
           onGuess={onGuess}

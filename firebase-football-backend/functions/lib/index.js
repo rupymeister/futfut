@@ -179,7 +179,7 @@ app.post('/games/validate', (req, res) => {
             });
             return;
         }
-        const MINIMUM_ANSWERS_REQUIRED = 10;
+        const MINIMUM_ANSWERS_REQUIRED = 3;
         const results = questions.map((question, index) => {
             var _a, _b;
             const answerCount = ((_a = question.correctAnswers) === null || _a === void 0 ? void 0 : _a.length) || 0;

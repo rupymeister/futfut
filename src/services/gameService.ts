@@ -23,13 +23,19 @@ interface GameAnswer {
 
 class GameApiService {
   private baseUrl: string;
+  
 
   constructor() {
-    // Use production Firebase Functions URL
-    this.baseUrl = import.meta.env.VITE_API_URL || 
-                   'https://us-central1-futfut-6a19f.cloudfunctions.net/api';
-                   
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+
+    this.baseUrl = isDevelopment
+      ? 'http://localhost:5001/futfut-6a19f/us-central1/api'
+      : (import.meta.env.VITE_API_URL || 'https://us-central1-futfut-6a19f.cloudfunctions.net/api');
+      
     console.log('🌐 API Base URL:', this.baseUrl);
+    console.log('🔧 Development mode:', isDevelopment);
   }
 
   // Test connection before making requests

@@ -158,7 +158,7 @@ app.post('/games/validate', (req: Request, res: Response): void => {
       return;
     }
 
-    const MINIMUM_ANSWERS_REQUIRED = 10;
+    const MINIMUM_ANSWERS_REQUIRED = 3;
     const results = questions.map((question, index) => {
       const answerCount = question.correctAnswers?.length || 0;
       const validAnswers = question.correctAnswers?.filter((answer: string) => 

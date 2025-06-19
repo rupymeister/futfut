@@ -17,7 +17,7 @@ interface Question {
 // Validation function to ensure all questions have at least 10 possible answers
 const validateMinimumAnswers = (questions: Question[]): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-  const MINIMUM_ANSWERS_REQUIRED = 10;
+  const MINIMUM_ANSWERS_REQUIRED = 3;
 
   questions.forEach((question) => {
     const answerCount = question.correctAnswers?.length || 0;
@@ -79,7 +79,7 @@ export const createGame = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // Validate that all questions have at least 10 possible answers
+    // Validate that all questions have at least 3 possible answers
     const validation = validateMinimumAnswers(questions);
     if (!validation.isValid) {
       console.warn('Game creation rejected due to insufficient answers:', validation.errors);
@@ -88,8 +88,8 @@ export const createGame = async (req: Request, res: Response): Promise<void> => 
         success: false,
         error: 'Cannot create game: Some questions do not have enough possible answers',
         details: {
-          requirement: 'Each question must have at least 10 different possible correct answers',
-          minimumRequired: 10,
+          requirement: 'Each question must have at least 3 different possible correct answers',
+          minimumRequired: 3,
           validationErrors: validation.errors,
           totalQuestions: questions.length,
           failedQuestions: validation.errors.length
@@ -109,7 +109,7 @@ export const createGame = async (req: Request, res: Response): Promise<void> => 
     }
 
     // Log successful validation
-    console.log(`✅ All ${questions.length} questions passed validation (minimum 10 answers each)`);
+    console.log(`✅ All ${questions.length} questions passed validation (minimum 3 answers each)`);
 
     // Create the game
     const result = await gameService.createGame({
@@ -128,7 +128,7 @@ export const createGame = async (req: Request, res: Response): Promise<void> => 
       message: `${gameMode} game created successfully with ${questions.length} validated questions`,
       validation: {
         passed: true,
-        minimumAnswersRequired: 10,
+        minimumAnswersRequired: 3,
         questionsValidated: questions.length
       }
     });
