@@ -43,15 +43,13 @@ const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
 const gameController = __importStar(require("./controllers/games"));
 const analyticsController = __importStar(require("./controllers/analytics"));
-// Initialize Firebase Admin with proper configuration
+// Initialize Firebase Admin
 if (!admin.apps.length) {
-    // Check if we're in emulator mode
     if (process.env.FUNCTIONS_EMULATOR === 'true') {
         console.log('🔧 Initializing Firebase Admin for emulator mode');
         admin.initializeApp({
             projectId: 'futfut-6a19f'
         });
-        // Connect to Firestore emulator
         const db = admin.firestore();
         db.settings({
             host: 'localhost:8080',
@@ -67,20 +65,51 @@ if (!admin.apps.length) {
 }
 exports.db = admin.firestore();
 const app = (0, express_1.default)();
-// Enable CORS for all routes
-// Find the CORS configuration and update it
-app.use((0, cors_1.default)({
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:5173', // Vite dev
-        'http://localhost:4173', // Vite preview
-        'https://futfut.vercel.app', // Your main Vercel domain
-        /https:\/\/futfut.*\.vercel\.app$/, // All Vercel preview deployments
-        /\.vercel\.app$/ // Allow all vercel subdomains
+// Enhanced CORS configuration
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://localhost:5173',
+            'http://localhost:4173',
+            'https://futfut.vercel.app',
+            'https://futfut-git-main-anilaltuncus-projects.vercel.app'
+        ];
+        // Check if origin is in allowed list or matches Vercel pattern
+        if (allowedOrigins.includes(origin) ||
+            /^https:\/\/futfut.*\.vercel\.app$/.test(origin) ||
+            /^https:\/\/.*\.vercel\.app$/.test(origin)) {
+            callback(null, true);
+        }
+        else {
+            console.warn('CORS blocked origin:', origin);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Origin',
+        'X-Requested-With',
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'Cache-Control'
     ],
-    credentials: true
-}));
+    optionsSuccessStatus: 200
+};
+app.use((0, cors_1.default)(corsOptions));
+// Handle preflight requests explicitly
+app.options('*', (0, cors_1.default)(corsOptions));
 app.use(express_1.default.json());
+// Add logging middleware to debug CORS
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path} - Origin: ${req.get('Origin')}`);
+    next();
+});
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Global error handler:', err);
@@ -102,12 +131,11 @@ app.get('/health', (req, res) => {
         message: `Firebase Functions is working in ${isEmulator ? 'emulator' : 'production'} mode!`
     });
 });
-// Test route with database connection test
+// Test route
 app.get('/test', async (req, res) => {
     console.log('Test endpoint called');
     const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
     try {
-        // Test Firestore connection
         console.log('Testing Firestore connection...');
         const testCollection = exports.db.collection('test');
         const testDoc = await testCollection.add({
@@ -116,10 +144,8 @@ app.get('/test', async (req, res) => {
             mode: isEmulator ? 'emulator' : 'production'
         });
         console.log('Test document created with ID:', testDoc.id);
-        // Read the document back to verify
         const docSnapshot = await testDoc.get();
         console.log('Test document data:', docSnapshot.data());
-        // Clean up test document
         await testDoc.delete();
         console.log('Test document deleted');
         res.status(200).json({
@@ -150,7 +176,7 @@ app.get('/test', async (req, res) => {
         });
     }
 });
-// Root route for testing
+// Root route
 app.get('/', (req, res) => {
     console.log('Root endpoint called');
     const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
@@ -168,9 +194,13 @@ app.put('/games/:id', gameController.updateGame);
 app.delete('/games/:id', gameController.deleteGame);
 app.post('/games/:gameId/answers', gameController.submitAnswer);
 app.post('/games/:gameId/end', gameController.endGame);
-// Debug endpoint to validate questions without creating a game
 app.post('/games/validate', (req, res) => {
+    // Remove these manual CORS headers - they conflict with global CORS
+    // res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
+    // res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    // res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     try {
+        console.log('Validation endpoint called with:', req.body);
         const { questions } = req.body;
         if (!Array.isArray(questions)) {
             res.status(400).json({
@@ -202,6 +232,7 @@ app.post('/games/validate', (req, res) => {
         });
         const validQuestions = results.filter(r => r.meetsMinimum);
         const invalidQuestions = results.filter(r => !r.meetsMinimum);
+        console.log('Validation completed:', { validQuestions: validQuestions.length, invalidQuestions: invalidQuestions.length });
         res.json({
             success: true,
             summary: {
