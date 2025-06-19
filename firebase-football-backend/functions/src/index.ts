@@ -164,12 +164,146 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Game routes
-app.post('/games', gameController.createGame);
-app.get('/games/:id', gameController.getGame);
-app.put('/games/:id', gameController.updateGame);
-app.delete('/games/:id', gameController.deleteGame);
-app.post('/games/:gameId/answers', gameController.submitAnswer);
-app.post('/games/:gameId/end', gameController.endGame);
+// Replace this line:
+// app.post('/games', gameController.createGame);
+
+// With this inline implementation:
+app.post('/games', async (req: Request, res: Response) => {
+  try {
+    console.log('🎮 Creating game via inline handler:', req.body);
+    
+    const { playerId, sessionId, gameMode, questions, player2Id } = req.body;
+    
+    // Basic validation
+    if (!playerId || !sessionId || !gameMode || !questions) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: playerId, sessionId, gameMode, questions'
+      });
+    }
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Questions must be a non-empty array'
+      });
+    }
+
+    // Use your existing gameService
+    const gameData = await gameService.createGame({
+      playerId,
+      sessionId,
+      gameMode,
+      player2Id,
+      questions: questions.map((q: any) => ({
+        questionNumber: q.questionNumber,
+        rowFeature: q.rowFeature,
+        rowFeatureType: q.rowFeatureType,
+        colFeature: q.colFeature,
+        colFeatureType: q.colFeatureType,
+        correctAnswers: q.correctAnswers,
+        cellPosition: q.cellPosition
+      }))
+    });
+
+    console.log('✅ Game created successfully:', gameData.game.id);
+
+    return res.status(201).json({
+      success: true,
+      data: gameData
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating game:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create game',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Replace these lines:
+// app.get('/games/:id', gameController.getGame);
+// app.put('/games/:id', gameController.updateGame);
+// app.delete('/games/:id', gameController.deleteGame);
+// app.post('/games/:gameId/answers', gameController.submitAnswer);
+// app.post('/games/:gameId/end', gameController.endGame);
+
+// With these inline implementations:
+app.get('/games/:id', async (req: Request, res: Response) => {
+  try {
+    const game = await gameService.getGame(req.params.id);
+    res.status(200).json({ success: true, data: game });
+  } catch (error) {
+    console.error('Error getting game:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get game',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/games/:gameId/answers', async (req: Request, res: Response) => {
+  try {
+    const answer = await gameService.submitAnswer({
+      gameId: req.params.gameId,
+      ...req.body
+    });
+    res.status(200).json({ success: true, data: answer });
+  } catch (error) {
+    console.error('Error submitting answer:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to submit answer',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/games/:gameId/end', async (req: Request, res: Response) => {
+  try {
+    const { winnerId } = req.body;
+    await gameService.endGame(req.params.gameId, winnerId);
+    res.status(200).json({ success: true, message: 'Game ended successfully' });
+  } catch (error) {
+    console.error('Error ending game:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to end game',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.put('/games/:id', async (req: Request, res: Response) => {
+  try {
+    const game = await gameService.updateGame(req.params.id, req.body);
+    res.status(200).json({ success: true, data: game });
+  } catch (error) {
+    console.error('Error updating game:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update game',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.delete('/games/:id', async (req: Request, res: Response) => {
+  try {
+    const result = await gameService.deleteGame(req.params.id);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error deleting game:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete game',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
 
 
 app.post('/games/validate', (req: Request, res: Response): void => {

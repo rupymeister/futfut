@@ -325,9 +325,8 @@ export function PlayerGrid({
     const fontSize = isHeader ? dimensions.headerFontSize : dimensions.fontSize;
     
     if (featureType === 'nationality' && !flagErrors[feature]) {
-      let flagId = countryFlagMap[feature] || countryNameToCode[feature] || '';
       
-      if (flagId) {
+      if (true) {
         return (
           <div style={{ 
             display: 'flex', 
@@ -338,7 +337,7 @@ export function PlayerGrid({
             gap: '2px'
           }}>
             <img 
-              src={`https://tmssl.akamaized.net//images/flagge/verysmall/${flagId}.png?lm=1520611569`}
+              src={`https://tmssl.akamaized.net//images/flagge/verysmall/${feature}.png?lm=1520611569`}
               alt={feature}
               style={{ 
                 width: flagSize, 
