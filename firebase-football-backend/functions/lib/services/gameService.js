@@ -50,6 +50,7 @@ const submitAnswer = async (answerData) => {
     const batch = index_1.db.batch();
     // Create answer
     const answerRef = index_1.db.collection('answers').doc();
+    console.log('Creating answer with data:', answerData);
     // Only include defined fields in the answer
     const answerToCreate = {
         id: answerRef.id,
@@ -57,6 +58,7 @@ const submitAnswer = async (answerData) => {
         questionId: answerData.questionId,
         playerId: answerData.playerId,
         playerGuess: answerData.playerGuess,
+        matchedPlayerName: answerData.matchedPlayerName || null, // Optional field
         isCorrect: answerData.isCorrect,
         allPossibleAnswers: answerData.allPossibleAnswers,
         gameMode: answerData.gameMode,

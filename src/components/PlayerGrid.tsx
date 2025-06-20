@@ -326,6 +326,7 @@ export function PlayerGrid({
     
     if (featureType === 'nationality' && !flagErrors[feature]) {
       
+      
       if (true) {
         return (
           <div style={{ 
@@ -337,7 +338,7 @@ export function PlayerGrid({
             gap: '2px'
           }}>
             <img 
-              src={`https://tmssl.akamaized.net//images/flagge/verysmall/${feature}.png?lm=1520611569`}
+              src={`https://tmssl.akamaized.net//images/flagge/verysmall/${countryFlagMap[feature] || encodeURIComponent(feature)}.png?lm=1520611569`}
               alt={feature}
               style={{ 
                 width: flagSize, 

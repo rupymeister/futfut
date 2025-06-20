@@ -795,28 +795,43 @@ export function Game({ players, onBackToMenu }: GameProps) {
       return normalizedName.includes(normalizedGuess) || normalizedGuess.includes(normalizedName);
     }) : undefined;
 
+    // Update your answer submission (around line 800):
     try {
-      // Submit answer to backend with all possible answers
-      const answerData: GameAnswer = {
-        questionId: question.id,
-        playerGuess: guess,
+      // Get player ID
+      const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
+      
+      // Submit answer with clean data structure
+      const answerData = {
+        playerId: playerId,
+        questionNumber: question.questionNumber,
+        playerName: guess,  // The actual guess
+        rowFeature: question.rowFeature,
+        colFeature: question.colFeature,
+        // Your tracking data
         isCorrect: correct,
-        matchedPlayerName: matchedPlayer?.name,
-        allPossibleAnswers: candidates.map(p => p.name), // All possible correct answers
-        gameMode: 'single'
+        matchedPlayerName: matchedPlayer?.name || null
       };
 
-      await gameApi.submitAnswer(currentGameId, answerData);
+      const result = await gameApi.submitAnswer(currentGameId, answerData);
       
-      console.log('💾 Single player answer saved:', {
-        question: `${question.rowFeature} × ${question.colFeature}`,
-        guess,
-        correct,
-        matchedPlayer: matchedPlayer?.name,
-        allPossibleAnswers: candidates.map(p => p.name)
+      console.log('💾 Answer submitted:', {
+        guess: guess,
+        isCorrect: result.validation.isCorrect,
+        matchedPlayer: result.validation.matchedPlayer,
+        backendResponse: result
       });
+
+      // Handle the result
+      if (result.validation.isCorrect) {
+        console.log(`✅ Correct! Matched: ${result.validation.matchedPlayer}`);
+        // Update UI for correct answer
+      } else {
+        console.log(`❌ Incorrect guess: ${guess}`);
+        // Update UI for incorrect answer
+      }
+
     } catch (error) {
-      console.error('Failed to save single player answer:', error);
+      console.error('Failed to submit answer:', error);
     }
     
     setGuessResult(correct);

@@ -83,7 +83,7 @@ export const submitAnswer = async (answerData: {
   
   // Create answer
   const answerRef = db.collection('answers').doc();
-  
+  console.log('Creating answer with data:', answerData);
   // Only include defined fields in the answer
   const answerToCreate: any = {
     id: answerRef.id,
@@ -91,6 +91,7 @@ export const submitAnswer = async (answerData: {
     questionId: answerData.questionId,
     playerId: answerData.playerId,
     playerGuess: answerData.playerGuess,
+    matchedPlayerName: answerData.matchedPlayerName || null, // Optional field
     isCorrect: answerData.isCorrect,
     allPossibleAnswers: answerData.allPossibleAnswers,
     gameMode: answerData.gameMode,

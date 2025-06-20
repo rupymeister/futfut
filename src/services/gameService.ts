@@ -60,41 +60,48 @@ class GameApiService {
     }
   }
 
+async submitAnswer(gameId: string, answerData: any) {
+  try {
+    console.log('📡 Submitting answer:', { gameId, answerData });
 
-  async submitAnswer(gameId: string, answer: GameAnswer) {
-    try {
-      const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
-      
-      const response = await fetch(`${this.baseUrl}/games/${gameId}/answers`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          ...answer,
-          playerId
-        })
-      });
+    // Only send the required fields that backend expects
+    const requestData = {
+      playerId: answerData.playerId || localStorage.getItem('playerId') || `player_${Date.now()}`,
+      questionNumber: answerData.questionNumber || 1,
+      playerName: answerData.playerName || answerData.playerGuess || answerData.guess,
+      rowFeature: answerData.rowFeature,
+      colFeature: answerData.colFeature,
+      // Additional tracking data (optional for backend)
+      isCorrect: answerData.isCorrect,
+      matchedPlayerName: answerData.matchedPlayerName
+    };
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`);
-      }
+    console.log('📡 Request data being sent to backend:', requestData);
 
-      const result = await response.json();
-      if (result.success) {
-        console.log('✅ Answer submitted successfully');
-        return result.data;
-      } else {
-        throw new Error(result.error || 'Failed to submit answer');
-      }
-    } catch (error) {
-      console.error('❌ Error submitting answer:', error);
-      throw error;
+    const response = await fetch(`${this.baseUrl}/games/${gameId}/answers`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Submit answer error:', errorText);
+      throw new Error(`Failed to submit answer: ${response.status} - ${errorText}`);
     }
-  }
 
+    const result = await response.json();
+    console.log('✅ Answer submitted successfully:', result);
+    
+    return result.data;
+  } catch (error) {
+    console.error('❌ Error submitting answer:', error);
+    throw error;
+  }
+}
   async getGameDetails(gameId: string) {
     try {
       const response = await fetch(`${this.baseUrl}/games/${gameId}`);
