@@ -37,7 +37,10 @@ const countryFlagMap: Record<string, string> = {
   "Peru": "133",
   "İran": "71",
   "Belçika": "19",
-  "Cezayir": "4"
+  "Cezayir": "4",
+  "Portekiz": "136",
+  "İngiltere": "189",
+  "İrlanda": "72",
 };
 
 const countryNameToCode: Record<string, string> = {

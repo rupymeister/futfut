@@ -5,7 +5,8 @@ import { PlayerGrid } from "./PlayerGrid";
 import PlayerGuess from "./PlayerGuess";
 import { analytics } from "../services/analytics";
 import { gameApi, type GameQuestion, type GameAnswer } from '../services/gameService';
-import playerData from "../data/player_list.json";
+import playerData from "../data/player_list_with_generalized_roles.json";
+import { questionGenerator } from "../services/questionGenerator";
 
 type GameProps = {
   players: EnhancedPlayer[];
@@ -60,10 +61,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
       
       // Extract roles from the teams string
       const roleMatches = player.teams.match(/\([\d-]+, ([^)]+)\)/g) || [];
-      const roles = Array.from(new Set(roleMatches.map(role => {
-        const match = role.match(/\([\d-]+, ([^)]+)\)/);
-        return match ? match[1] : "";
-      }).filter(Boolean)));
+      const roles = player.generalized_roles;
       
       // Determine nationality based on image URL
       let nationality = "";
@@ -85,7 +83,7 @@ export function Game({ players, onBackToMenu }: GameProps) {
         nationality,
         teamHistory: teams.map(team => ({
           team,
-          seasons: roles.map(role => ({ role }))
+          seasons: Array.isArray(roles) ? roles.map((role: string) => ({ role })) : [{ role: roles }]
         }))
       } as EnhancedPlayer;
     });
@@ -547,132 +545,103 @@ export function Game({ players, onBackToMenu }: GameProps) {
     return bestGrid;
   };
 
-  // Update the initializeGame function with Firebase integration and validation
-  const initializeGame = async () => {
-    const maxGenerationAttempts = 10;
-    
-    if (generationAttempts >= maxGenerationAttempts) {
-      setGameGenerationError(
-        'Tek oyuncu oyunu için yeterli oyuncu verisi bulunamadı. Her soru için en az 3 farklı cevap gerekli. ' +
-        'Lütfen oyuncu veritabanını genişletin veya daha az kısıtlayıcı kriterler kullanın.'
-      );
-      setIsGeneratingGame(false);
-      return;
-    }
+  // Replace line 569 and the initialization check:
+const initializeGame = async () => {
+  const maxGenerationAttempts = 3;
+  
+  if (generationAttempts >= maxGenerationAttempts) {
+    setGameGenerationError(
+      'Tek oyuncu oyunu için yeterli oyuncu verisi bulunamadı. Her soru için en az 3 farklı cevap gerekli.'
+    );
+    setIsGeneratingGame(false);
+    return;
+  }
 
+  try {
     setIsGeneratingGame(true);
     setGenerationAttempts(prev => prev + 1);
+
+    console.log('🎮 Starting optimized single player game generation...');
     
-    const { cells, rowHeaders, colHeaders } = generateValidGrid();
-    
-    const GRID_SIZE = 3;
-    const expectedCellCount = GRID_SIZE * GRID_SIZE;
-    const MINIMUM_ANSWERS_PER_QUESTION = 3;
-    
-    // Check if we have enough valid cells
-    if (cells.length < expectedCellCount) {
-      // console.log(`❌ Incomplete single player grid generated (${cells.length}/${expectedCellCount} cells). Restarting...`);
-      setTimeout(() => {
-        initializeGame();
-      }, 100);
-      return;
+    // Initialize the generator with ALL players (including JSON data)
+    // FIXED: Use isInitialized property instead of getIsInitialized() method
+    if (!questionGenerator.isInitialized) {
+      console.log('Initializing question generator with all players:', allPlayers.length);
+      await questionGenerator.initialize(allPlayers);
     }
-    
-    // Double-check that all cells have at least 10 answers
-    const insufficientCells = cells.filter(cell => cell.players.length < MINIMUM_ANSWERS_PER_QUESTION);
-    if (insufficientCells.length > 0) {
-      // console.log(`❌ Single player grid has ${insufficientCells.length} cells with insufficient answers. Restarting...`);
-      insufficientCells.forEach(cell => {
-        // console.log(`  ${cell.rowFeature} × ${cell.colFeature}: ${cell.players.length} answers`);
-      });
-      setTimeout(() => {
-        initializeGame();
-      }, 100);
-      return;
+
+    // Check if we can generate enough questions
+    if (!questionGenerator.canGenerate(9, 'mixed')) {
+      throw new Error('Not enough valid combinations available');
     }
+
+    // Generate questions using optimized algorithm
+    const generatedQuestions = questionGenerator.generateQuestions(9, 'mixed', true, true);
     
-    // console.log(`✅ Complete single player grid generated with ${cells.length} cells, all with ${MINIMUM_ANSWERS_PER_QUESTION}+ answers.`);
+    if (generatedQuestions.length < 9) {
+      throw new Error(`Only generated ${generatedQuestions.length}/9 questions`);
+    }
+
+    console.log('✅ Questions generated successfully:', generatedQuestions.length);
+
+    // Create the game on the backend
+    const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
+    localStorage.setItem('playerId', playerId);
+
+    const gameData = await gameApi.createGame(
+      playerId,
+      `session_${Date.now()}`,
+      'single',
+      generatedQuestions
+    );
+
+    // Set up the game state
+    setCurrentGameId(gameData.game.id);
+    setGameQuestions(gameData.questions || generatedQuestions);
     
-    // Log answer counts for verification
-    cells.forEach((cell, index) => {
-      // console.log(`Single Player Question ${index + 1} (${cell.rowFeature} × ${cell.colFeature}): ${cell.players.length} possible answers`);
-    });
-    
-    // Prepare questions for the backend
-    const questions: GameQuestion[] = cells.map((cell, index) => ({
-      questionNumber: index + 1,
-      rowFeature: cell.rowFeature,
-      rowFeatureType: cell.rowFeatureType,
-      colFeature: cell.colFeature,
-      colFeatureType: cell.colFeatureType,
-      correctAnswers: cell.players.map(p => p.name),
-      cellPosition: {
-        row: cell.row,
-        col: cell.col
-      }
+    // Create grid from questions using allPlayers for finding criteria
+    const gridSize = 3;
+    const newValidCells: GameCell[] = generatedQuestions.map((q, index) => ({
+      row: Math.floor(index / gridSize),
+      col: index % gridSize,
+      rowFeature: q.rowFeature,
+      rowFeatureType: q.rowFeatureType,
+      colFeature: q.colFeature,
+      colFeatureType: q.colFeatureType,
+      players: findPlayersForCriteria(q.rowFeature, q.colFeature, q.rowFeatureType, q.colFeatureType)
     }));
 
-    try {
-      // Validate questions with backend before creating game
-      // console.log('🔍 Validating single player questions with backend...');
-      const validation = await gameApi.validateQuestions(questions);
-      
-      if (!validation.isValid) {
-        console.warn('❌ Single player backend validation failed. Regenerating game...', validation);
-        setTimeout(() => {
-          initializeGame();
-        }, 100);
-        return;
-      }
-      
-      // console.log('✅ Single player backend validation passed:', validation.summary);
+    setValidCells(newValidCells);
+    
+    // Set headers
+    const uniqueRows = Array.from(new Set(generatedQuestions.map(q => q.rowFeature)))
+      .slice(0, 3)
+      .map((feature, index) => {
+        const question = generatedQuestions.find(q => q.rowFeature === feature);
+        return { feature, type: question?.rowFeatureType || 'team' };
+      });
 
-      // Create single player game in backend
-      const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
-      const sessionId = `single_${playerId}_${Date.now()}`;
-      
-      const gameData = await gameApi.createGame(
-        playerId, 
-        sessionId,
-        'single', // Game mode
-        questions
-      );
-      
-      setCurrentGameId(gameData.game.id);
-      setGameQuestions(gameData.questions);
-      
-      // console.log('🎮 Single player game created with ID:', gameData.game.id);
-      // console.log('📊 Single player game validation summary:', gameData.validation || 'No validation data');
-    } catch (error) {
-      console.error('❌ Failed to create single player game in backend:', error);
-      
-      // If backend validation fails, regenerate the game
-      if (error instanceof Error && error.message.includes('validation')) {
-        // console.log('🔄 Regenerating single player game due to validation failure...');
-        setTimeout(() => {
-          initializeGame();
-        }, 100);
-        return;
-      }
-    }
+    const uniqueCols = Array.from(new Set(generatedQuestions.map(q => q.colFeature)))
+      .slice(0, 3)
+      .map((feature, index) => {
+        const question = generatedQuestions.find(q => q.colFeature === feature);
+        return { feature, type: question?.colFeatureType || 'role' };
+      });
 
-    // If successful, clear loading state
+    setHeaderRows(uniqueRows);
+    setHeaderCols(uniqueCols);
     setIsGeneratingGame(false);
-    setGenerationAttempts(0);
-    setGameGenerationError(null);
-    
-    setValidCells(cells);
-    setHeaderRows(rowHeaders);
-    setHeaderCols(colHeaders);
-    
-    setSelectedCell(null);
-    setGuessResult(null);
-    setAnsweredCells([]);
-    
+
+    console.log('🎉 Single player game initialized successfully!');
+    console.log('📊 Game stats:', questionGenerator.getStats());
+
+  } catch (error) {
+    console.error('❌ Failed to generate game:', error);
     setTimeout(() => {
-      logCorrectAnswers(cells);
-    }, 500);
-  };
+      initializeGame();
+    }, 100);
+  }
+};
 
   // Initialize game when component mounts
   useEffect(() => {
@@ -868,41 +837,141 @@ export function Game({ players, onBackToMenu }: GameProps) {
     setGuessResult(null);
   };
 
-  // Update newGame function with Firebase integration
-  const newGame = async () => {
-    // End current game if exists
-    if (currentGameId) {
-      try {
-        await gameApi.endGame(currentGameId);
-      } catch (error) {
-        console.error('Failed to end previous single player game:', error);
-      }
+  // Update the newGame function to generate fresh questions:
+const newGame = async () => {
+  // End current game if exists
+  if (currentGameId) {
+    try {
+      await gameApi.endGame(currentGameId);
+    } catch (error) {
+      console.error('Failed to end previous single player game:', error);
+    }
+  }
+
+  // Track game end for analytics
+  analytics.trackEvent('game_end', {
+    gameMode: 'single',
+    gridInfo: {
+      totalCells: 9,
+      validCells: validCells.length,
+      answeredCells: answeredCells.length
+    },
+    score: answeredCells.length
+  });
+
+  // Reset state
+  setCurrentGameId(null);
+  setGameQuestions([]);
+  setAnsweredCells([]);
+  setSelectedCell(null);
+  setGuessResult(null);
+  setGameGenerationError(null);
+  setGenerationAttempts(0);
+  
+  // DON'T reset gameInitialized - we want to keep the generator initialized
+  // but generate fresh questions
+  
+  // Generate new game with fresh questions
+  await generateNewGameWithFreshQuestions();
+};
+
+// Update the generateNewGameWithFreshQuestions function:
+const generateNewGameWithFreshQuestions = async () => {
+  const maxGenerationAttempts = 3;
+  
+  if (generationAttempts >= maxGenerationAttempts) {
+    setGameGenerationError(
+      'Tek oyuncu oyunu için yeterli oyuncu verisi bulunamadı. Her soru için en az 3 farklı cevap gerekli.'
+    );
+    setIsGeneratingGame(false);
+    return;
+  }
+
+  try {
+    setIsGeneratingGame(true);
+    setGenerationAttempts(prev => prev + 1);
+
+    console.log('🎮 Generating NEW single player game with fresh questions...');
+    
+    // Ensure generator is initialized with all players
+    // FIXED: Use isInitialized property instead of getIsInitialized() method
+    if (!questionGenerator.isInitialized) {
+      console.log('Initializing question generator with all players:', allPlayers.length);
+      await questionGenerator.initialize(allPlayers);
     }
 
-    // Track game end for analytics
-    analytics.trackEvent('game_end', {
-      gameMode: 'single',
-      gridInfo: {
-        totalCells: 9,
-        validCells: validCells.length,
-        answeredCells: answeredCells.length
-      },
-      score: answeredCells.length
-    });
+    // Check if we can generate enough questions
+    if (!questionGenerator.canGenerate(9, 'mixed')) {
+      throw new Error('Not enough valid combinations available');
+    }
 
-    // Reset state
-    setCurrentGameId(null);
-    setGameQuestions([]);
-    setAnsweredCells([]);
-    setSelectedCell(null);
-    setGuessResult(null);
-    setGameGenerationError(null); // Reset error state
-    setGenerationAttempts(0); // Reset attempts
-    gameInitialized.current = false;
+    // Generate FRESH questions using the new method
+    const generatedQuestions = questionGenerator.generateFreshQuestions(9, 'mixed', true, true);
     
-    // Initialize new game
-    initializeGame();
-  };
+    if (generatedQuestions.length < 9) {
+      throw new Error(`Only generated ${generatedQuestions.length}/9 questions`);
+    }
+
+    console.log('✅ FRESH questions generated successfully:', generatedQuestions.length);
+
+    // Create the game on the backend
+    const playerId = localStorage.getItem('playerId') || `player_${Date.now()}`;
+    localStorage.setItem('playerId', playerId);
+
+    const gameData = await gameApi.createGame(
+      playerId,
+      `session_${Date.now()}`,
+      'single',
+      generatedQuestions
+    );
+
+    // Set up the game state
+    setCurrentGameId(gameData.game.id);
+    setGameQuestions(gameData.questions || generatedQuestions);
+    
+    // Create grid from questions
+    const gridSize = 3;
+    const newValidCells: GameCell[] = generatedQuestions.map((q, index) => ({
+      row: Math.floor(index / gridSize),
+      col: index % gridSize,
+      rowFeature: q.rowFeature,
+      rowFeatureType: q.rowFeatureType,
+      colFeature: q.colFeature,
+      colFeatureType: q.colFeatureType,
+      players: findPlayersForCriteria(q.rowFeature, q.colFeature, q.rowFeatureType, q.colFeatureType)
+    }));
+
+    setValidCells(newValidCells);
+    
+    // Set headers
+    const uniqueRows = Array.from(new Set(generatedQuestions.map(q => q.rowFeature)))
+      .slice(0, 3)
+      .map((feature, index) => {
+        const question = generatedQuestions.find(q => q.rowFeature === feature);
+        return { feature, type: question?.rowFeatureType || 'team' };
+      });
+
+    const uniqueCols = Array.from(new Set(generatedQuestions.map(q => q.colFeature)))
+      .slice(0, 3)
+      .map((feature, index) => {
+        const question = generatedQuestions.find(q => q.colFeature === feature);
+        return { feature, type: question?.colFeatureType || 'role' };
+      });
+
+    setHeaderRows(uniqueRows);
+    setHeaderCols(uniqueCols);
+    setIsGeneratingGame(false);
+
+    console.log('🎉 NEW single player game with fresh questions initialized successfully!');
+    console.log('📊 Game stats:', questionGenerator.getStats());
+
+  } catch (error) {
+    console.error('❌ Failed to generate fresh game:', error);
+    setTimeout(() => {
+      generateNewGameWithFreshQuestions();
+    }, 100);
+  }
+};
 
   // Türkçe karşılıklarını göster
   const getFeatureTypeName = (type: FeatureCategory | null): string => {
